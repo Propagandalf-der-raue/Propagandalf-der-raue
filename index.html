@@ -1,12 +1,14 @@
-<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <title>Video zu GIF (Live-Modus)</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    canvas { border: 1px solid #999; }
-    input { margin-bottom: 10px; display: block; }
+    canvas { border: 1px solid #999; display: block; margin-bottom: 10px; }
+    input, label { margin-bottom: 10px; display: block; }
+    progress { width: 100%; height: 20px; margin-bottom: 10px; }
+    #output img { display: block; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -21,6 +23,8 @@
 
   <button id="startBtn">GIF erstellen</button>
   <p id="status">Bereit.</p>
+
+  <progress id="progress" max="100" value="0"></progress>
   <canvas id="canvas"></canvas>
   <div id="output"></div>
 
@@ -34,6 +38,7 @@
     const ctx = canvas.getContext('2d');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
+    const progressBar = document.getElementById('progress');
 
     let gif;
 
@@ -66,11 +71,16 @@
           workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js'
         });
 
+        gif.setOptions({
+          repeat: 0,        // Endlosschleife
+          background: '#fff',
+          transparent: null
+        });
+
         let lastFrameTime = 0;
         const frameInterval = 1 / fps;
-        let prevTime = 0;
 
-        const draw = (time) => {
+        const draw = () => {
           if (video.paused || video.ended) return finishGIF();
 
           const currentTime = video.currentTime;
@@ -81,28 +91,40 @@
             status.textContent = `Sammle Frames... (${currentTime.toFixed(2)}s)`;
           }
 
+          // Fortschritt aktualisieren
+          progressBar.value = (video.currentTime / video.duration) * 100;
+
           requestAnimationFrame(draw);
         };
 
         video.onended = finishGIF;
-        video.play().then(() => {
-          requestAnimationFrame(draw);
-        });
-
-        function finishGIF() {
-          status.textContent = "GIF wird gerendert...";
-          gif.on('finished', blob => {
-            const img = document.createElement('img');
-            img.src = URL.createObjectURL(blob);
-            output.innerHTML = '';
-            output.appendChild(img);
-            status.textContent = "GIF ist fertig – hol dir dein Meisterwerk!";
-          });
-          gif.render();
-        }
+        video.addEventListener('play', () => requestAnimationFrame(draw));
+        video.play();
       });
 
       video.load();
+
+      function finishGIF() {
+        status.textContent = "GIF wird gerendert...";
+        gif.on('finished', blob => {
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(blob);
+          img.loop = true;
+
+          const downloadLink = document.createElement('a');
+          downloadLink.href = img.src;
+          downloadLink.download = "dein_meisterwerk.gif";
+          downloadLink.textContent = "GIF herunterladen";
+          downloadLink.style.display = 'inline-block';
+          downloadLink.style.marginTop = '10px';
+
+          output.innerHTML = '';
+          output.appendChild(img);
+          output.appendChild(downloadLink);
+          status.textContent = "GIF ist fertig – und heißer als je zuvor!";
+        });
+        gif.render();
+      }
     };
   </script>
 </body>
